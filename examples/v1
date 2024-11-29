@@ -1,0 +1,168 @@
+import pygame
+import sys
+import random
+import math
+
+# Inicialización de Pygame
+pygame.init()
+pygame.mixer.init()
+
+# Configuración de la pantalla
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Aim Trainer")
+
+# Colores
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+BLACK = (0, 0, 0)
+
+# Fuentes
+font = pygame.font.Font(None, 36)
+
+# Sonidos
+hit_sound = pygame.mixer.Sound("pistol-shot-233473.wav")  # Asegúrate de tener este archivo de sonido
+
+class Target:
+    def __init__(self, x, y, radius):
+        self.x = x
+        self.y = y
+        self.radius = radius
+
+    def draw(self):
+        pygame.draw.circle(screen, RED, (self.x, self.y), self.radius)
+
+    def check_hit(self, mouse_pos):
+        distance = math.hypot(mouse_pos[0] - self.x, mouse_pos[1] - self.y)
+        return distance <= self.radius
+
+class Game:
+    def __init__(self):
+        self.targets = []
+        self.score = 0
+        self.level = 1
+        self.time_left = 30
+        self.game_state = "menu"
+        self.high_score = 0
+
+    def generate_target(self):
+        x = random.randint(50, WIDTH - 50)
+        y = random.randint(50, HEIGHT - 50)
+        radius = max(10, 30 - self.level * 2)
+        self.targets.append(Target(x, y, radius))
+
+    def update(self):
+        if len(self.targets) < 3 + self.level:
+            self.generate_target()
+
+    def draw(self):
+        screen.fill(BLACK)
+        for target in self.targets:
+            target.draw()
+        
+        score_text = font.render(f"Score: {self.score}", True, WHITE)
+        level_text = font.render(f"Level: {self.level}", True, WHITE)
+        time_text = font.render(f"Time: {int(self.time_left)}", True, WHITE)
+        
+        screen.blit(score_text, (10, 10))
+        screen.blit(level_text, (10, 50))
+        screen.blit(time_text, (WIDTH - 150, 10))
+
+    def check_hit(self, mouse_pos):
+        for target in self.targets[:]:
+            if target.check_hit(mouse_pos):
+                self.targets.remove(target)
+                self.score += 10 * self.level
+                hit_sound.play()
+                if self.score % 100 == 0:
+                    self.level += 1
+                return True
+        return False
+
+    def run(self):
+        clock = pygame.time.Clock()
+        start_time = pygame.time.get_ticks()
+
+        while self.game_state == "playing":
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1:  # Left mouse button
+                        self.check_hit(pygame.mouse.get_pos())
+
+            self.update()
+            self.draw()
+            pygame.display.flip()
+
+            self.time_left = max(30 - (pygame.time.get_ticks() - start_time) / 1000, 0)
+            if self.time_left <= 0:
+                self.game_state = "game_over"
+
+            clock.tick(60)
+
+    def show_menu(self):
+        screen.fill(BLACK)
+        title_text = font.render("Aim Trainer", True, WHITE)
+        start_text = font.render("Click to Start", True, WHITE)
+        high_score_text = font.render(f"High Score: {self.high_score}", True, WHITE)
+
+        screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, HEIGHT // 3))
+        screen.blit(start_text, (WIDTH // 2 - start_text.get_width() // 2, HEIGHT // 2))
+        screen.blit(high_score_text, (WIDTH // 2 - high_score_text.get_width() // 2, HEIGHT * 2 // 3))
+
+        pygame.display.flip()
+
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    waiting = False
+                    self.game_state = "playing"
+                    self.score = 0
+                    self.level = 1
+                    self.time_left = 30
+                    self.targets = []
+
+    def show_game_over(self):
+        screen.fill(BLACK)
+        game_over_text = font.render("Juego terminado", True, WHITE)
+        score_text = font.render(f"Final Score: {self.score}", True, WHITE)
+        restart_text = font.render("Click to Restart", True, WHITE)
+
+        screen.blit(game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, HEIGHT // 3))
+        screen.blit(score_text, (WIDTH // 2 - score_text.get_width() // 2, HEIGHT // 2))
+        screen.blit(restart_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT * 2 // 3))
+
+        if self.score > self.high_score:
+            self.high_score = self.score
+
+        pygame.display.flip()
+
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    waiting = False
+                    self.game_state = "menu"
+
+def main():
+    game = Game()
+    
+    while True:
+        if game.game_state == "menu":
+            game.show_menu()
+        elif game.game_state == "playing":
+            game.run()
+        elif game.game_state == "game_over":
+            game.show_game_over()
+
+if __name__ == "__main__":
+    main()
